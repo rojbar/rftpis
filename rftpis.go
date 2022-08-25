@@ -2,7 +2,6 @@ package rftpis
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -16,7 +15,7 @@ const BUFFERSIZE = 4096
 
 // OK
 func Server() {
-	ln, err := net.Listen("tcp", ":9900")
+	ln, err := net.Listen("tcp", ":5000")
 	if err != nil {
 		panic(err)
 	}
@@ -94,9 +93,8 @@ func handleRecieveFile(conn net.Conn, message string) {
 
 	extension, errExt := utils.GetKey(message, "EXTENSION")
 	if errExt != nil {
+		extension = " "
 		print(errExt)
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-		return
 	}
 
 	buffer := make([]byte, BUFFERSIZE)
@@ -116,55 +114,40 @@ func handleRecieveFile(conn net.Conn, message string) {
 	writer := bufio.NewWriter(file)
 
 	for i := 0; i < int(loops); i++ {
-		bytesRead, errR := io.ReadFull(conn, buffer)
-		fmt.Println("BYTES READ CONN", bytesRead)
-		if errR != nil {
-			if errR == io.EOF {
-				break
-			}
-			print(errR)
+		errRnWf := readNetWriteFile(conn, buffer, *writer)
+		if errRnWf != nil {
+			print(errRnWf)
 			utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-			return
-		}
-
-		_, errW := writer.Write(buffer)
-		if errW != nil {
-			utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-			print(errW)
-			return
-		}
-		errF := writer.Flush()
-		if errW != nil {
-			utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-			print(errF)
 			return
 		}
 	}
-	bytesRead, errR := io.ReadFull(conn, lessBuffer)
-	fmt.Println("BYTES READ CONN", bytesRead)
+	errRnWf := readNetWriteFile(conn, lessBuffer, *writer)
+	if errRnWf != nil {
+		print(errRnWf)
+		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
+		return
+	}
+
+	utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
+}
+
+func readNetWriteFile(conn net.Conn, buffer []byte, writer bufio.Writer) error {
+	_, errR := io.ReadFull(conn, buffer)
 	if errR != nil {
 		if errR == io.EOF {
-			fmt.Println("A")
+			print(errR)
 		}
-		print(errR)
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-		return
-
+		return errR
 	}
-	_, errW := writer.Write(lessBuffer)
+
+	_, errW := writer.Write(buffer)
 	if errW != nil {
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-		print(errW)
-		return
+		return errW
 	}
 	errF := writer.Flush()
-	if errW != nil {
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
-		print(errF)
-		return
+	if errF != nil {
+		return errF
 	}
 
-	fmt.Println("estoy aqui")
-	utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
-	fmt.Println("llegue aqui")
+	return nil
 }
