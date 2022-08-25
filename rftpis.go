@@ -16,7 +16,7 @@ const BUFFERSIZE = 4096
 
 // OK
 func Server() {
-	ln, err := net.Listen("tcp", ":9800")
+	ln, err := net.Listen("tcp", ":9900")
 	if err != nil {
 		panic(err)
 	}
