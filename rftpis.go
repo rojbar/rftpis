@@ -2,12 +2,13 @@ package rftpis
 
 import (
 	"bufio"
-	"io"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/rojbar/rftpis/mgmt"
 	"github.com/rojbar/rftpis/structs"
 	utils "github.com/rojbar/rftpiu"
 )
@@ -16,9 +17,13 @@ const BUFFERSIZE = 4096
 
 // OK
 func Server() {
-	reads := make(chan structs.ReadFromChannel)
-	writes := make(chan structs.WriteToChannel)
-	go state(reads, writes)
+	channelComm, channelMemoryComm := mgmt.Init()
+	for i := 0; i < 50; i++ {
+		err := os.MkdirAll("recieve/channels/"+strconv.Itoa(i), 0750)
+		if err != nil && !os.IsExist(err) {
+			panic(err)
+		}
+	}
 
 	ln, err := net.Listen("tcp", ":5000")
 	if err != nil {
@@ -31,35 +36,12 @@ func Server() {
 			print(errA)
 			continue
 		}
-		go recieve(conn, reads, writes)
-	}
-}
-
-func state(reads chan structs.ReadFromChannel, writes chan structs.WriteToChannel) {
-	channels := make(map[string]*structs.Channel)
-
-	for i := 0; i < 50; i++ {
-		channels[strconv.Itoa(i)] = &structs.Channel{Suscribers: 0, Files: make([]string, 0)}
-	}
-
-	for {
-		select {
-		case read := <-reads:
-			read.Response <- structs.ChannelState{Suscribers: channels[read.Alias].Suscribers, LastFile: channels[read.Alias].Files[len(channels[read.Alias].Files)-1]}
-		case write := <-writes:
-			if write.File != "" {
-				channels[write.Alias].Files = append(channels[write.Alias].Files, write.File)
-			}
-			if write.Suscriber != 0 {
-				channels[write.Alias].Suscribers += write.Suscriber
-			}
-			write.Response <- true
-		}
+		go recieve(conn, channelComm, channelMemoryComm)
 	}
 }
 
 //OK
-func recieve(conn net.Conn, reads chan structs.ReadFromChannel, writes chan structs.WriteToChannel) {
+func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string]structs.ChannelMemoryComm) {
 	// here we recieve the request
 	message, errR := utils.ReadMessage(conn)
 	if errR != nil {
@@ -78,49 +60,39 @@ func recieve(conn net.Conn, reads chan structs.ReadFromChannel, writes chan stru
 		return
 	}
 
+	channel, errCh := utils.GetKey(message, "CHANNEL")
+	if errCh != nil {
+		print(errCh)
+		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
+		conn.Close()
+		return
+	}
+
 	//redirect according to client action
 	switch action {
 	case "SEND":
-		go handleRecieveFile(conn, message, reads, writes)
+		go handleRecieveFile(conn, message, chComm)
 
 	case "SUBSCRIBE":
-		go handleSubscription(conn, message)
+		go handleSubscription(conn, message, chComm, chMeComm[channel])
 
 	default:
 		conn.Close()
 	}
 }
 
-//NOT OK
-func handleSubscription(conn net.Conn, message string) {
-	defer conn.Close()
-	utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
-}
-
 //OK
-func handleRecieveFile(conn net.Conn, message string, reads chan structs.ReadFromChannel, writes chan structs.WriteToChannel) {
+func handleRecieveFile(conn net.Conn, message string, channelComm structs.ChannelStateComm) {
 	defer conn.Close()
 
 	//here we check message data
 	channelName, errCN := utils.GetKey(message, "CHANNEL")
-	if errCN != nil {
-		print(errCN)
+	value, errSz := utils.GetKey(message, "SIZE")
+	fileSize, errAtoi := strconv.Atoi(value)
+	if errCN != nil || errSz != nil || errAtoi != nil || fileSize <= 0 {
+		print(errCN, errSz, errAtoi)
 		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
 		conn.Close()
-		return
-	}
-
-	value, errSz := utils.GetKey(message, "SIZE")
-	if errSz != nil {
-		print(errSz)
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
-		return
-	}
-
-	fileSize, errAtoi := strconv.Atoi(value)
-	if errAtoi != nil || fileSize <= 0 {
-		print(errAtoi)
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
 		return
 	}
 
@@ -136,7 +108,7 @@ func handleRecieveFile(conn net.Conn, message string, reads chan structs.ReadFro
 
 	lessBuffer := make([]byte, sizeLastRead)
 
-	file, errC := os.Create(uuid.NewString() + "." + extension)
+	file, errC := os.Create("recieve/channels/" + channelName + "/" + uuid.NewString() + "." + extension)
 	if errC != nil {
 		print(errC)
 		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
@@ -154,14 +126,14 @@ func handleRecieveFile(conn net.Conn, message string, reads chan structs.ReadFro
 	writer := bufio.NewWriter(file)
 
 	for i := 0; i < int(loops); i++ {
-		errRnWf := readNetWriteFile(conn, buffer, *writer)
+		errRnWf := utils.ReadThenWrite(conn, *writer, buffer)
 		if errRnWf != nil {
 			print(errRnWf)
 			utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
 			return
 		}
 	}
-	errRnWf := readNetWriteFile(conn, lessBuffer, *writer)
+	errRnWf := utils.ReadThenWrite(conn, *writer, lessBuffer)
 	if errRnWf != nil {
 		print(errRnWf)
 		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
@@ -171,28 +143,25 @@ func handleRecieveFile(conn net.Conn, message string, reads chan structs.ReadFro
 	//we inform the client that we recieve the client successfully
 	utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
 
+	fmt.Println("RECIEVED FILE CORRECTLY, INFORM STATE ", file.Name(), channelName)
 	//here we add the file to the queue of files to be send by the server to the channel
-	writeToChannel := structs.WriteToChannel{Alias: channelName, Suscriber: 0, File: file.Name(), Response: make(chan bool)}
-	writes <- writeToChannel
-	<-writeToChannel.Response
+	writeChannelState := structs.WriteChannelState{
+		Alias:    channelName,
+		Data:     structs.ChannelState{Suscribers: 0, LastFile: file.Name()},
+		Response: make(chan bool)}
+	channelComm.Write <- writeChannelState
+	fmt.Println("SENDED STATE")
+	<-writeChannelState.Response
 }
 
-func readNetWriteFile(conn net.Conn, buffer []byte, writer bufio.Writer) error {
-	_, errR := io.ReadFull(conn, buffer)
-	if errR != nil {
-		if errR == io.EOF {
-			print(errR)
-		}
-		return errR
+//NOT OK
+func handleSubscription(conn net.Conn, message string, chStComm structs.ChannelStateComm, channelMemory structs.ChannelMemoryComm) {
+	defer conn.Close()
+	// here we inform he is subscribed
+	errI := utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
+	if errI != nil {
+		print(errI)
+		return
 	}
-	_, errW := writer.Write(buffer)
-	if errW != nil {
-		return errW
-	}
-	errF := writer.Flush()
-	if errF != nil {
-		return errF
-	}
-
-	return nil
+	//notify state that a client has subscribe and wait for the next file tobe send
 }
