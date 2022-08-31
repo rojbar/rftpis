@@ -26,21 +26,21 @@ func transmissionManager(trStComm structs.TransmissionStatusComm, chMeComm map[s
 			channels[write.Alias] = &write.Data
 			write.Response <- true
 		default:
-			// we start a channel manager, the channel manager should
-			// inform when it has finished, in case it fails whe should retry and after some retrys we should dropped it or inform state
-			for key, channel := range channels {
-				if !channel.IsTransfering && !channel.IsError && channel.File != "" {
-					channel.IsTransfering = true
-					fmt.Println("iniciando channel Manager en status A", channel, uuid.NewString())
-					go channelManagerIO(channel.File, key, trStComm, chMeComm[key])
+		}
+		// we start a channel manager, the channel manager should
+		// inform when it has finished, in case it fails whe should retry and after some retrys we should dropped it or inform state
+		for key, channel := range channels {
+			if !channel.IsTransfering && !channel.IsError && channel.File != "" {
+				channel.IsTransfering = true
+				fmt.Println("iniciando channel Manager en status A", channel, uuid.NewString())
+				go channelManagerIO(channel.File, key, trStComm, chMeComm[key])
 
-				}
-				if !channel.IsTransfering && channel.IsError {
-					channel.IsError = false
-					channel.IsTransfering = true
-					fmt.Println("iniciando channel Manager en status B", channel, uuid.NewString())
-					go channelManagerIO(channel.File, key, trStComm, chMeComm[key])
-				}
+			}
+			if !channel.IsTransfering && channel.IsError {
+				channel.IsError = false
+				channel.IsTransfering = true
+				fmt.Println("iniciando channel Manager en status B", channel, uuid.NewString())
+				go channelManagerIO(channel.File, key, trStComm, chMeComm[key])
 			}
 		}
 	}

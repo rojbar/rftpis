@@ -29,24 +29,24 @@ func state(chStComm structs.ChannelStateComm, trStComm structs.TransmissionStatu
 			}
 			write.Response <- true
 		default:
-			// we inform the transmission manager of new files to be send to each channel
-			for key, elem := range channels {
-				// we ask the transmission manager if the channel is being currently broadcasting a file
-				transmissionStatus := structs.ReadTransmissionStatus{
-					Alias:    key,
-					Response: make(chan structs.TransmissionStatus),
-				}
+		}
+		// we inform the transmission manager of new files to be send to each channel
+		for key, elem := range channels {
+			// we ask the transmission manager if the channel is being currently broadcasting a file
+			transmissionStatus := structs.ReadTransmissionStatus{
+				Alias:    key,
+				Response: make(chan structs.TransmissionStatus),
+			}
 
-				trStComm.Read <- transmissionStatus
-				isCurrentlyBroadcasting := <-transmissionStatus.Response
+			trStComm.Read <- transmissionStatus
+			isCurrentlyBroadcasting := <-transmissionStatus.Response
 
-				if !isCurrentlyBroadcasting.IsTransfering && !isCurrentlyBroadcasting.IsError && len(elem.Files) != 0 {
-					firstFileAdded := elem.Files[0] // get element from queue
-					elem.Files = elem.Files[1:]     //removes element from queue
-					writeManager := structs.WriteTranmissionStatus{Alias: key, Data: structs.TransmissionStatus{File: firstFileAdded, IsTransfering: false, IsError: false}, Response: make(chan bool)}
-					trStComm.Write <- writeManager
-					<-writeManager.Response
-				}
+			if !isCurrentlyBroadcasting.IsTransfering && !isCurrentlyBroadcasting.IsError && len(elem.Files) != 0 {
+				firstFileAdded := elem.Files[0] // get element from queue
+				elem.Files = elem.Files[1:]     //removes element from queue
+				writeManager := structs.WriteTranmissionStatus{Alias: key, Data: structs.TransmissionStatus{File: firstFileAdded, IsTransfering: false, IsError: false}, Response: make(chan bool)}
+				trStComm.Write <- writeManager
+				<-writeManager.Response
 			}
 		}
 	}

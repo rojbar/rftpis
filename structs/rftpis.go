@@ -54,12 +54,15 @@ type ChannelMemoryComm struct {
 }
 
 type ChannelMemory struct {
+	Data      []byte
+	IsMessage bool
 }
 
 type ReadChannelMemory struct {
-	Response chan bool
+	Response chan ChannelMemory
 }
 
 type WriteChannelMemory struct {
+	Data     ChannelMemory
 	Response chan bool
 }
