@@ -15,25 +15,29 @@ const BUFFERSIZE = 4096
 
 // OK
 func Server() {
+	utils.InitializeLogger()
 	channelComm, channelMemoryComm := mgmt.Init()
+
 	for i := 0; i < 50; i++ {
 		err := os.MkdirAll("recieve/channels/"+strconv.Itoa(i), 0750)
 		if err != nil && !os.IsExist(err) {
-			panic(err)
+			utils.Logger.Panic(err.Error())
 		}
 	}
 
 	ln, err := net.Listen("tcp", ":5000")
 	if err != nil {
-		panic(err)
+		utils.Logger.Panic(err.Error())
 	}
+	utils.Logger.Info("initiated server in port 5000")
 	defer ln.Close()
 	for {
 		conn, errA := ln.Accept()
 		if errA != nil {
-			print(errA)
+			utils.Logger.Error(errA.Error())
 			continue
 		}
+		utils.Logger.Info("recieved new client connection")
 		go recieve(conn, channelComm, channelMemoryComm)
 	}
 }
@@ -43,7 +47,7 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 	// here we recieve the request
 	message, errR := utils.ReadMessage(conn)
 	if errR != nil {
-		print(errR)
+		utils.Logger.Error(errR.Error())
 		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
 		conn.Close()
 		return
@@ -53,7 +57,8 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 	action, errA := utils.GetKey(message, "ACTION")
 	channel, errCh := utils.GetKey(message, "CHANNEL")
 	if errA != nil || errCh != nil {
-		print(errA, errCh)
+		utils.Logger.Error(errA.Error())
+		utils.Logger.Error(errCh.Error())
 		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
 		conn.Close()
 		return
@@ -63,10 +68,8 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 	switch action {
 	case "SEND":
 		go handlers.HandleRecieveFile(conn, message, chComm)
-
 	case "SUBSCRIBE":
 		go handlers.HandleSubscription(conn, message, chComm, chMeComm[channel])
-
 	default:
 		conn.Close()
 	}

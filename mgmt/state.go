@@ -1,10 +1,10 @@
 package mgmt
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/rojbar/rftpis/structs"
+	utils "github.com/rojbar/rftpiu"
 )
 
 func state(chStComm structs.ChannelStateComm, trStComm structs.TransmissionStatusComm) {
@@ -12,7 +12,9 @@ func state(chStComm structs.ChannelStateComm, trStComm structs.TransmissionStatu
 	for i := 0; i < 50; i++ {
 		channels[strconv.Itoa(i)] = &structs.Channel{Suscribers: 0, Files: make([]string, 0)}
 	}
-	fmt.Println("STATE INITAL VALUE", channels)
+
+	utils.Logger.Info("state initiated with x channels")
+
 	for {
 		select {
 		case read := <-chStComm.Read:
@@ -32,6 +34,9 @@ func state(chStComm structs.ChannelStateComm, trStComm structs.TransmissionStatu
 		}
 		// we inform the transmission manager of new files to be send to each channel
 		for key, elem := range channels {
+			if elem.Suscribers == 0 {
+				continue
+			}
 			// we ask the transmission manager if the channel is being currently broadcasting a file
 			transmissionStatus := structs.ReadTransmissionStatus{
 				Alias:    key,
@@ -39,9 +44,10 @@ func state(chStComm structs.ChannelStateComm, trStComm structs.TransmissionStatu
 			}
 
 			trStComm.Read <- transmissionStatus
-			isCurrentlyBroadcasting := <-transmissionStatus.Response
+			transmissionManagerState := <-transmissionStatus.Response
 
-			if !isCurrentlyBroadcasting.IsTransfering && !isCurrentlyBroadcasting.IsError && len(elem.Files) != 0 {
+			if !transmissionManagerState.IsTransfering && !transmissionManagerState.IsError && len(elem.Files) != 0 {
+				utils.Logger.Info("informing transmission manager of new file to the channel")
 				firstFileAdded := elem.Files[0] // get element from queue
 				elem.Files = elem.Files[1:]     //removes element from queue
 				writeManager := structs.WriteTranmissionStatus{Alias: key, Data: structs.TransmissionStatus{File: firstFileAdded, IsTransfering: false, IsError: false}, Response: make(chan bool)}

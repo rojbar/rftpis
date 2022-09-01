@@ -56,6 +56,9 @@ type ChannelMemoryComm struct {
 type ChannelMemory struct {
 	Data      []byte
 	IsMessage bool
+	Count     int
+	Id        string
+	IsEOF     bool
 }
 
 type ReadChannelMemory struct {

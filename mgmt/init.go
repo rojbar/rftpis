@@ -4,9 +4,11 @@ import (
 	"strconv"
 
 	"github.com/rojbar/rftpis/structs"
+	utils "github.com/rojbar/rftpiu"
 )
 
 func Init() (structs.ChannelStateComm, map[string]structs.ChannelMemoryComm) {
+	utils.Logger.Info("initiating server state")
 	chComm := structs.ChannelStateComm{
 		Read:  make(chan structs.ReadChannelState),
 		Write: make(chan structs.WriteChannelState),
@@ -29,5 +31,6 @@ func Init() (structs.ChannelStateComm, map[string]structs.ChannelMemoryComm) {
 	go state(chComm, trStComm)
 	go transmissionManager(trStComm, chMeComm)
 
+	utils.Logger.Info("server state initiated")
 	return chComm, chMeComm
 }

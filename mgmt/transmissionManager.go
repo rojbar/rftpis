@@ -1,11 +1,11 @@
 package mgmt
 
 import (
-	"fmt"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/rojbar/rftpis/structs"
+	utils "github.com/rojbar/rftpiu"
+	"go.uber.org/zap"
 )
 
 func transmissionManager(trStComm structs.TransmissionStatusComm, chMeComm map[string]structs.ChannelMemoryComm) {
@@ -13,6 +13,8 @@ func transmissionManager(trStComm structs.TransmissionStatusComm, chMeComm map[s
 	for i := 0; i < 50; i++ {
 		channels[strconv.Itoa(i)] = &structs.TransmissionStatus{File: "", IsTransfering: false, IsError: false}
 	}
+
+	utils.Logger.Info("transmission manager initiated, managing x channels")
 
 	for {
 		select {
@@ -32,14 +34,14 @@ func transmissionManager(trStComm structs.TransmissionStatusComm, chMeComm map[s
 		for key, channel := range channels {
 			if !channel.IsTransfering && !channel.IsError && channel.File != "" {
 				channel.IsTransfering = true
-				fmt.Println("iniciando channel Manager en status A", channel, uuid.NewString())
+				utils.Logger.Info("initiating channel manager with", zap.String("channel:", key), zap.String("File:", channel.File))
 				go channelManagerIO(channel.File, key, trStComm, chMeComm[key])
 
 			}
 			if !channel.IsTransfering && channel.IsError {
 				channel.IsError = false
 				channel.IsTransfering = true
-				fmt.Println("iniciando channel Manager en status B", channel, uuid.NewString())
+				utils.Logger.Info("initiating channel manager for retry with", zap.String("channel:", key), zap.String("File:", channel.File))
 				go channelManagerIO(channel.File, key, trStComm, chMeComm[key])
 			}
 		}
