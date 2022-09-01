@@ -85,7 +85,7 @@ func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelS
 					utils.Logger.Info("handle subscription we recieve a message an this FOR is only for sending chunks of data", zap.Int("chunkSize", len(current.Data)))
 					break
 				}
-				utils.Logger.Info("hanlde subscription sending chunk to client", zap.Int(string(current.Data)))
+				utils.Logger.Info("hanlde subscription sending chunk to client", zap.Int("chunk size", len(current.Data)))
 
 				_, errW := writer.Write(current.Data)
 				if errW != nil {
