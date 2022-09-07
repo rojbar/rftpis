@@ -1,7 +1,14 @@
 package structs
 
 type Channel struct {
-	Suscribers int
+	Id         string
+	Suscribers map[string]*Suscriber
+	Files      []string
+}
+
+type ChannelState struct {
+	Id         string
+	Suscribers map[string]Suscriber
 	Files      []string
 }
 
@@ -10,20 +17,29 @@ type ChannelStateComm struct {
 	Write chan WriteChannelState
 }
 
-type ChannelState struct {
-	Suscribers int
-	LastFile   string
-}
-
 type ReadChannelState struct {
 	Alias    string
 	Response chan ChannelState
 }
 
 type WriteChannelState struct {
-	Alias    string
-	Data     ChannelState
-	Response chan bool
+	Alias            string
+	AddSuscriber     bool
+	AddSuscriberData Suscriber
+	RemoveSuscriber  string
+	AddFile          string
+	RemoveFile       string
+	Response         chan bool
+}
+
+type Suscriber struct {
+	Id   string
+	Comm SuscriberComm
+}
+
+type SuscriberComm struct {
+	Read  chan ReadChannelMemory
+	Write chan WriteChannelMemory
 }
 
 type TransmissionStatusComm struct {

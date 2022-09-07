@@ -1,7 +1,7 @@
 package mgmt
 
 import (
-	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -53,11 +53,13 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 		},
 		Response: make(chan bool),
 	}
-	writeInMemoryUntilOk(chMeComm, messageGonnaSend)
+	chMeComm.Write <- messageGonnaSend
+	<-messageGonnaSend.Response
 
 	//after informing the user we are gonna send a new file we start transfering the data
 
-	reader := bufio.NewReader(file)
+	//reader := bufio.NewReader(file)
+
 	buffer := make([]byte, BUFFERSIZE)
 	chunks, sizeLastChunk := utils.CalculateChunksToSendExactly(int(sizeInt), BUFFERSIZE)
 	remainderBuffer := make([]byte, sizeLastChunk)
@@ -67,15 +69,20 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 		loops += 1
 	}
 
-	utils.Logger.Info("channel manager ready for sending file to memory", zap.String("channel", channelName), zap.String("file", fileName), zap.Int("loops", loops))
+	utils.Logger.Info("channel manager ready for sending file to memory", zap.String("channel", channelName), zap.String("file", fileName),
+		zap.Int("chunks", chunks), zap.Int("loops", loops))
 	for i := 0; i < loops; i++ {
 		auxBuffer := buffer
 		isEof := false
+
 		if i == chunks {
+			utils.Logger.Info("sending last chunk of data")
 			auxBuffer = remainderBuffer
 			isEof = true
 		}
-		_, errP := reader.Read(auxBuffer)
+
+		a, errP := io.ReadFull(file, auxBuffer)
+		utils.Logger.Info("read bytes", zap.Int("bytes", a), zap.Int("loops", loops), zap.Int("loop", i))
 		if errP != nil {
 			if errP == io.EOF {
 				utils.Logger.Info("channel manager read EOF prematurly", zap.String("channel", channelName), zap.String("file", fileName))
@@ -83,12 +90,12 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 				break
 			}
 			if errP != nil {
+				fmt.Println("NO LEIMOS TODO")
 				utils.Logger.Error(errP.Error())
 				//inform of error the tranmission manager
 				return
 			}
 		}
-
 		//here we send the buffered data we read
 		utils.Logger.Info(
 			"channel manager sending chunk of data to memory",
@@ -98,9 +105,13 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 			zap.Int("chunk size", len(auxBuffer)),
 			zap.Bool("isEof", isEof),
 		)
+
+		c := make([]byte, len(auxBuffer))
+		copy(c, auxBuffer)
+
 		messageGonnaSend = structs.WriteChannelMemory{
 			Data: structs.ChannelMemory{
-				Data:      auxBuffer,
+				Data:      c,
 				IsMessage: false,
 				Count:     i,
 				Id:        fileName,
@@ -108,7 +119,8 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 			},
 			Response: make(chan bool),
 		}
-		writeInMemoryUntilOk(chMeComm, messageGonnaSend)
+		chMeComm.Write <- messageGonnaSend
+		<-messageGonnaSend.Response
 	}
 
 	// if all alright here we inform the transmissionStatus we are done
@@ -117,19 +129,6 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 		Data:     structs.TransmissionStatus{File: "", IsTransfering: false, IsError: false},
 		Response: make(chan bool),
 	}
-
 	trStComm.Write <- messageTest
 	<-messageTest.Response
-}
-
-// this is here because the queue in chanel memory can become full so we should wait
-// buffered channels are not recommended as implementations of queue so i strive for this solution
-func writeInMemoryUntilOk(chMeComm structs.ChannelMemoryComm, messageGonnaSend structs.WriteChannelMemory) {
-	for {
-		chMeComm.Write <- messageGonnaSend
-		ok := <-messageGonnaSend.Response
-		if ok {
-			break
-		}
-	}
 }

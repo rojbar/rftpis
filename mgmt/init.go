@@ -25,7 +25,7 @@ func Init() (structs.ChannelStateComm, map[string]structs.ChannelMemoryComm) {
 			Read:  make(chan structs.ReadChannelMemory),
 			Write: make(chan structs.WriteChannelMemory),
 		}
-		go channelMemory(strconv.Itoa(i), chMeComm[strconv.Itoa(i)])
+		go channelMemory(strconv.Itoa(i), chMeComm[strconv.Itoa(i)], chComm)
 	}
 
 	go state(chComm, trStComm)

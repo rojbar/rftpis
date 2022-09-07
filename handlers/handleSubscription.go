@@ -4,20 +4,34 @@ import (
 	"bufio"
 	"net"
 
+	"github.com/google/uuid"
 	"github.com/rojbar/rftpis/structs"
 	utils "github.com/rojbar/rftpiu"
 	"go.uber.org/zap"
 )
 
 //OK
-func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelStateComm, chanMem structs.ChannelMemoryComm) {
+func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelStateComm) {
 	defer conn.Close()
+
+	suscription := structs.Suscriber{
+		Id: uuid.NewString(),
+		Comm: structs.SuscriberComm{
+			Read:  make(chan structs.ReadChannelMemory),
+			Write: make(chan structs.WriteChannelMemory),
+		},
+	}
+
 	utils.Logger.Info("initiated handle subscription recieved message", zap.String("message", message))
 	channelName, _ := utils.GetKey(message, "CHANNEL")
 	updateState := structs.WriteChannelState{
-		Alias:    channelName,
-		Data:     structs.ChannelState{Suscribers: 1, LastFile: ""},
-		Response: make(chan bool),
+		Alias:            channelName,
+		AddSuscriber:     true,
+		AddSuscriberData: suscription,
+		RemoveSuscriber:  "",
+		AddFile:          "",
+		RemoveFile:       "",
+		Response:         make(chan bool),
 	}
 	chStComm.Write <- updateState
 	<-updateState.Response
@@ -32,9 +46,10 @@ func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelS
 
 	//we read the channel
 	for {
-		readMessage := structs.ReadChannelMemory{Response: make(chan structs.ChannelMemory)}
-		chanMem.Read <- readMessage
-		memoryMessage := <-readMessage.Response
+		readMessage := <-suscription.Comm.Write
+		readMessage.Response <- true
+
+		memoryMessage := readMessage.Data
 
 		if memoryMessage.IsMessage {
 			utils.Logger.Info("handle subscription sending message from memory", zap.String("message", string(memoryMessage.Data)))
@@ -60,9 +75,9 @@ func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelS
 			writer := bufio.NewWriter(conn)
 			passed := memoryMessage
 			for {
-				readChunk := structs.ReadChannelMemory{Response: make(chan structs.ChannelMemory)}
-				chanMem.Read <- readChunk
-				current := <-readChunk.Response
+				readChunk := <-suscription.Comm.Write
+				readChunk.Response <- true
+				current := readChunk.Data
 
 				if current.Id == "EMPTY MEMORY" {
 					continue
@@ -85,10 +100,11 @@ func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelS
 					utils.Logger.Info("handle subscription we recieve a message an this FOR is only for sending chunks of data", zap.Int("chunkSize", len(current.Data)))
 					break
 				}
-				utils.Logger.Info("hanlde subscription sending chunk to client", zap.Int("chunk size", len(current.Data)))
+				//utils.Logger.Info("hanlde subscription sending chunk to client", zap.Int("chunk", current.Count), zap.Int("chunk size", len(current.Data)), zap.Any("a", string(current.Data)))
 
 				_, errW := writer.Write(current.Data)
 				if errW != nil {
+					utils.Logger.Info("AH", zap.String("ah", errW.Error()))
 					utils.Logger.Error(errW.Error())
 				}
 				errF := writer.Flush()

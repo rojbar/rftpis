@@ -79,9 +79,12 @@ func HandleRecieveFile(conn net.Conn, message string, channelComm structs.Channe
 	utils.Logger.Info("handl recieve file recivied file correctly informing state", zap.String("channel", channelName), zap.String("file", file.Name()))
 	//here we add the file to the queue of files to be send by the server to the channel
 	writeChannelState := structs.WriteChannelState{
-		Alias:    channelName,
-		Data:     structs.ChannelState{Suscribers: 0, LastFile: file.Name()},
-		Response: make(chan bool)}
+		Alias:           channelName,
+		AddSuscriber:    false,
+		RemoveSuscriber: "",
+		AddFile:         file.Name(),
+		RemoveFile:      "",
+		Response:        make(chan bool)}
 	channelComm.Write <- writeChannelState
 	<-writeChannelState.Response
 }

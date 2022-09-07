@@ -55,7 +55,7 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 
 	// here we parse
 	action, errA := utils.GetKey(message, "ACTION")
-	channel, errCh := utils.GetKey(message, "CHANNEL")
+	_, errCh := utils.GetKey(message, "CHANNEL")
 	if errA != nil || errCh != nil {
 		utils.Logger.Error(errA.Error())
 		utils.Logger.Error(errCh.Error())
@@ -69,7 +69,7 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 	case "SEND":
 		go handlers.HandleRecieveFile(conn, message, chComm)
 	case "SUBSCRIBE":
-		go handlers.HandleSubscription(conn, message, chComm, chMeComm[channel])
+		go handlers.HandleSubscription(conn, message, chComm)
 	default:
 		conn.Close()
 	}
