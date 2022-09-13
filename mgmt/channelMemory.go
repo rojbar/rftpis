@@ -31,7 +31,7 @@ func distributeMessage(channelState structs.ChannelState, data structs.ChannelMe
 	for key := range channelState.Suscribers {
 		go func(element structs.Suscriber) {
 			responseWriteToClient := make(chan bool)
-			timer := time.NewTimer(10000 * time.Second)
+			timer := time.NewTimer(200 * time.Millisecond)
 			go func() {
 				element.Comm.Write <- structs.WriteChannelMemory{
 					Data:     data,

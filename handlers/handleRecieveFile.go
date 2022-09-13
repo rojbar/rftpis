@@ -24,7 +24,7 @@ func HandleRecieveFile(conn net.Conn, message string, channelComm structs.Channe
 	fileSize, errAtoi := strconv.Atoi(value)
 	if errCN != nil || errSz != nil || errAtoi != nil || fileSize <= 0 {
 		utils.Logger.Error("handle recieve file error in message attributes", zap.String("channelAtrr", channelName), zap.String("sizeAttr", errSz.Error()+errAtoi.Error()))
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
+		utils.SendMessage(conn, "RFTP > 1.0 STATUS: MALFORMED_REQUEST;")
 		conn.Close()
 		return
 	}
@@ -38,13 +38,13 @@ func HandleRecieveFile(conn net.Conn, message string, channelComm structs.Channe
 	file, errC := os.Create("recieve/channels/" + channelName + "/" + uuid.NewString() + "." + extension)
 	if errC != nil {
 		utils.Logger.Error(errC.Error())
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
+		utils.SendMessage(conn, "RFTP > 1.0 STATUS: NOT OK;")
 		return
 	}
 	defer file.Close()
 
 	// here we inform the client all ready for recieving file
-	errI := utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
+	errI := utils.SendMessage(conn, "RFTP > 1.0 STATUS: OK;")
 	if errI != nil {
 		utils.Logger.Error(errI.Error())
 		return
@@ -70,13 +70,13 @@ func HandleRecieveFile(conn net.Conn, message string, channelComm structs.Channe
 		errRnWf := utils.ReadThenWrite(conn, *writer, auxBuffer)
 		if errRnWf != nil {
 			utils.Logger.Error(errRnWf.Error())
-			utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
+			utils.SendMessage(conn, "RFTP > 1.0 STATUS: NOT OK;")
 			return
 		}
 	}
 	//we inform the client that we recieve the file successfully
-	utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
-	utils.Logger.Info("handl recieve file recivied file correctly informing state", zap.String("channel", channelName), zap.String("file", file.Name()))
+	utils.SendMessage(conn, "RFTP > 1.0 STATUS: OK;")
+	utils.Logger.Info("handle recieve file recivied file correctly informing state", zap.String("channel", channelName), zap.String("file", file.Name()))
 	//here we add the file to the queue of files to be send by the server to the channel
 	writeChannelState := structs.WriteChannelState{
 		Alias:           channelName,

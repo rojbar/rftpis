@@ -38,7 +38,7 @@ func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelS
 	utils.Logger.Info("handle subscription updated state")
 
 	// here we inform he is subscribed
-	errI := utils.SendMessage(conn, "SFTP > 1.0 STATUS: OK;")
+	errI := utils.SendMessage(conn, "RFTP > 1.0 STATUS: OK;")
 	if errI != nil {
 		utils.Logger.Error("user didnt respond to maintain connection", zap.String("error", errI.Error()))
 		return
@@ -100,11 +100,9 @@ func HandleSubscription(conn net.Conn, message string, chStComm structs.ChannelS
 					utils.Logger.Info("handle subscription we recieve a message an this FOR is only for sending chunks of data", zap.Int("chunkSize", len(current.Data)))
 					break
 				}
-				//utils.Logger.Info("hanlde subscription sending chunk to client", zap.Int("chunk", current.Count), zap.Int("chunk size", len(current.Data)), zap.Any("a", string(current.Data)))
 
 				_, errW := writer.Write(current.Data)
 				if errW != nil {
-					utils.Logger.Info("AH", zap.String("ah", errW.Error()))
 					utils.Logger.Error(errW.Error())
 				}
 				errF := writer.Flush()

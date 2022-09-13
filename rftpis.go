@@ -48,7 +48,7 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 	message, errR := utils.ReadMessage(conn)
 	if errR != nil {
 		utils.Logger.Error(errR.Error())
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: NOT OK;")
+		utils.SendMessage(conn, "RFTP > 1.0 STATUS: NOT OK;")
 		conn.Close()
 		return
 	}
@@ -59,7 +59,7 @@ func recieve(conn net.Conn, chComm structs.ChannelStateComm, chMeComm map[string
 	if errA != nil || errCh != nil {
 		utils.Logger.Error(errA.Error())
 		utils.Logger.Error(errCh.Error())
-		utils.SendMessage(conn, "SFTP > 1.0 STATUS: MALFORMED_REQUEST;")
+		utils.SendMessage(conn, "RFTP > 1.0 STATUS: MALFORMED_REQUEST;")
 		conn.Close()
 		return
 	}

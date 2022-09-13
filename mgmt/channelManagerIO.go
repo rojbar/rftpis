@@ -1,7 +1,6 @@
 package mgmt
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -41,7 +40,7 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 	}
 
 	// we first inform the user we are gonna send a file
-	messageNewFile := []byte("SFTP > 1.0 ACTION: SEND SIZE: " + size + " " + ext + " CHANNEL: " + channelName + ";")
+	messageNewFile := []byte("RFTP > 1.0 ACTION: SEND SIZE: " + size + " " + ext + " CHANNEL: " + channelName + ";")
 	utils.Logger.Info("channel manager sending message new file to memory", zap.String("channel", channelName), zap.String("file", fileName), zap.String("message", string(messageNewFile)))
 	messageGonnaSend := structs.WriteChannelMemory{
 		Data: structs.ChannelMemory{
@@ -90,7 +89,6 @@ func channelManagerIO(fileName string, channelName string, trStComm structs.Tran
 				break
 			}
 			if errP != nil {
-				fmt.Println("NO LEIMOS TODO")
 				utils.Logger.Error(errP.Error())
 				//inform of error the tranmission manager
 				return
