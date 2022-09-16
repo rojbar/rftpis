@@ -19,13 +19,13 @@ func channelMemory(alias string, chMeComm structs.ChannelMemoryComm, stChComm st
 			}
 			stChComm.Read <- readState
 			channelState := <-readState.Response
-			distributeMessage(channelState, write.Data)
+			distributeMessage(channelState, write.Data, stChComm, alias)
 			write.Response <- true
 		}
 	}
 }
 
-func distributeMessage(channelState structs.ChannelState, data structs.ChannelMemory) {
+func distributeMessage(channelState structs.ChannelState, data structs.ChannelMemory, stChComm structs.ChannelStateComm, alias string) {
 	results := make(chan bool, len(channelState.Suscribers))
 
 	for key := range channelState.Suscribers {
@@ -43,6 +43,17 @@ func distributeMessage(channelState structs.ChannelState, data structs.ChannelMe
 				results <- true
 			case <-timer.C:
 				utils.Logger.Info("coudlnt write to handle subscription on time")
+				//we remove the handle subscription from the state
+				updateState := structs.WriteChannelState{
+					Alias:           alias,
+					AddSuscriber:    false,
+					RemoveSuscriber: element.Id,
+					AddFile:         "",
+					RemoveFile:      "",
+					Response:        make(chan bool),
+				}
+				stChComm.Write <- updateState
+				<-updateState.Response
 				results <- false
 			}
 		}(channelState.Suscribers[key])
